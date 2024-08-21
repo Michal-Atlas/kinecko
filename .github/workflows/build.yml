@@ -16,12 +16,10 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
       - name: Run `nix build`
-        run: nix build .#kinecko
+        run: nix build .
       - uses: actions/download-artifact@v4
       - name: Run kinecko
-        run: nix run -- movies.txt
-        with:
-          TMDB_KEY: '${{ secrets.TMDB_KEY }}'
+        run: TMDB_KEY='${{ secrets.TMDB_KEY }}' nix run . -- movies.txt
       - uses: actions/upload-artifact@v4
         with:
           path: |
