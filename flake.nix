@@ -49,7 +49,7 @@
           devShells.default = pkgs.mkShell {
             inputsFrom = [ config.haskellProjects.default.outputs.devShell ];
           };
-          packages.default = pkgs.runCommand "kinecko-wrapper" { } ''
+          packages.default = pkgs.runCommand "kinecko" { } ''
             . ${pkgs.makeWrapper}/nix-support/setup-hook
             makeWrapper ${self'.packages.kinecko}/bin/kinecko $out/bin/kinecko \
                           --suffix PATH : ${lib.makeBinPath [ pkgs.gmic ]}
