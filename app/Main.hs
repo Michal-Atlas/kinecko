@@ -92,8 +92,8 @@ ensureDownloaded inp = do
   createDirectoryIfMissing True downloadDir
   mapM (uncurry ensureFile) inp
 
-generateMontage :: [FilePath] -> IO ()
-generateMontage files = do
+generateMontage :: [FilePath] -> FilePath -> IO ()
+generateMontage files output = do
   callProcess "gmic" $
     files
       ++ [ "rr2d",
@@ -103,13 +103,19 @@ generateMontage files = do
            "pack",
            "1,-k",
            "output",
-           "output.jpg"
+           output
          ]
 
 main :: IO ()
 main = do
   args <- getArgs
-  let file = fromMaybe (error "Give me file of IDs") $ listToMaybe args
+  let (file, output) =
+        fromMaybe
+          (error "Usage: <input> <output>")
+          ( case args of
+              [file, output] -> Just (file, output)
+              _ -> Nothing
+          )
   ids <- loadIDs file
   conf <- getCachedConfig
   urls <- run $ mapM (idToUrl conf) ids
@@ -117,6 +123,6 @@ main = do
   case urls of
     Right posters -> do
       files <- ensureDownloaded $ zip ids $ last <$> posters
-      generateMontage files
+      generateMontage files output
       print files
     Left err -> error $ show err
