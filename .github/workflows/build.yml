@@ -17,23 +17,22 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
       - name: Run `nix build`
         run: nix build .
-      - uses: actions/download-artifact@v4
-        with:
-          name: store
-          path: .
+      # - uses: actions/download-artifact@v4
+      #   with:
+      #     name: store
+      #     path: .
       - run: mkdir build
       - name: Run kinecko
         run: nix run . -- movies.txt build/output.jpg
         env:
           TMDB_KEY: '${{ secrets.TMDB_KEY }}'
-      - run: tree ..
-      - uses: actions/upload-artifact@v4
-        with:
-          name: store
-          path: |
-            config.json
-            store
-          overwrite: true
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: store
+      #     path: |
+      #       config.json
+      #       store
+      #     overwrite: true
       - name: make install
         uses: JamesIves/github-pages-deploy-action@v4.2.3
         with:
