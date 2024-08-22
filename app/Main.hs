@@ -74,7 +74,7 @@ ensureFile item url = do
     exists
     ( do
         putStr "Will download item "
-        putStr $ item
+        putStr $ show item
         putStr "... "
         do
           req <- parseRequest $ Text.unpack url
