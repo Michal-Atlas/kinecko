@@ -63,12 +63,24 @@ idToFilePath item = downloadDir ++ "/" ++ show item ++ ".jpg"
 ensureFile :: ItemID -> URL -> IO FilePath
 ensureFile item url = do
   exists <- doesFileExist path
+  when
+    exists
+    ( do
+        putStr "Item "
+        putStr $ show item
+        putStrLn " already present"
+    )
   unless
     exists
     ( do
-        req <- parseRequest $ Text.unpack url
-        imgData <- httpBS req
-        BS.writeFile path $ getResponseBody imgData
+        putStr "Will download item "
+        putStr $ item
+        putStr "... "
+        do
+          req <- parseRequest $ Text.unpack url
+          imgData <- httpBS req
+          BS.writeFile path $ getResponseBody imgData
+        putStrLn "done"
     )
 
   return path
