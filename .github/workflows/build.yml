@@ -22,19 +22,21 @@ jobs:
       #   with:
       #     name: store
       #     path: .
-      - run: mkdir build
       - name: Run kinecko
-        run: nix run . -- movies.txt build/output.jpg
+        run: nix run . -- movies.txt output.jpg
         env:
           TMDB_KEY: '${{ secrets.TMDB_KEY }}'
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: store
-      #     path: |
-      #       config.json
-      #       store
-      #     overwrite: true
-      - uses: JamesIves/github-pages-deploy-action@v4.6.3
+      - uses: actions/upload-artifact@v4
         with:
-          branch: gh-pages
-          folder: build
+          name: store
+          path: |
+            config.json
+            store
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image
+          path: output.jpg
+      - uses: actions/deploy-pages@4.0.5
+        with:
+          artifact_name: image
