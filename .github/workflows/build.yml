@@ -5,11 +5,12 @@ on:
   pull_request:
 
 jobs:
-  check:
+  build:
     runs-on: ubuntu-22.04
     permissions:
-      id-token: "write"
-      contents: "read"
+      id-token: write
+      pages: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
