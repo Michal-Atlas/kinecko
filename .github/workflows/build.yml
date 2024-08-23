@@ -18,10 +18,11 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
       - name: Run `nix build`
         run: nix build .
-      # - uses: actions/download-artifact@v4
-      #   with:
-      #     name: store
-      #     path: .
+      - uses: actions/download-artifact@v4
+        with:
+          name: store
+          path: .
+      - run: unzip store.zip
       - name: Run kinecko
         run: nix run . -- movies.txt output.jpg
         env:
