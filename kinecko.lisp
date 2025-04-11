@@ -1,3 +1,5 @@
+#!/usr/bin/env -S sbcl --script
+
 (require :asdf)
 (require :dexador)
 (require :com.inuoe.jzon)
@@ -19,6 +21,7 @@
   (let ((path (movie-path m)))
     (unless (uiop:file-exists-p path)
       (format t "Downloading poster for '~a'... " (movie-title m))
+      (ensure-directories-exist path :verbose t)
       (alexandria.2:write-byte-vector-into-file
        (dex:get (format nil "https://image.tmdb.org/t/p/original~a"
                         (movie-image-url m)))
