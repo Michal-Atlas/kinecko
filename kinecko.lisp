@@ -5,7 +5,8 @@
 (require :com.inuoe.jzon)
 
 ;; (setf dex:*verbose* t)
-(defvar *api-path* "https://api.themoviedb.org/3")
+(defvar *api-path* (quri:uri "https://api.themoviedb.org/3/movie/"))
+(defvar *img-api-path* (quri:uri "https://image.tmdb.org/t/p/original/"))
 (defvar *api-key* (uiop:getenv "TMDB_KEY"))
 (defvar *db-file* #P"movies.txt")
 
@@ -23,8 +24,9 @@
       (format t "Downloading poster for '~a'... " (movie-title m))
       (ensure-directories-exist path :verbose t)
       (alexandria.2:write-byte-vector-into-file
-       (dex:get (format nil "https://image.tmdb.org/t/p/original~a"
-                        (movie-image-url m)))
+       (dex:get (quri:merge-uris
+                 (format nil ".~a" (movie-image-url m))
+                 *img-api-path*))
        path)
       (format t "done~%"))))
 
@@ -33,9 +35,11 @@
   (let* ((table
           (com.inuoe.jzon:parse
            (dex:get
-            (format nil
-                    "~a/movie/~a?api_key=~a"
-                    *api-path* id *api-key*))))
+            (quri:merge-uris
+             (quri:make-uri
+              :path (write-to-string id)
+              :query `(("api_key" . ,*api-key*)))
+             *api-path*))))
          (movie (make-movie :id id
                             :title (gethash "original_title" table)
                             :image-url (gethash "poster_path" table))))
