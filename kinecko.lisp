@@ -18,7 +18,7 @@
 (defun movie-poster (m)
   (let ((path (movie-path m)))
     (unless (uiop:file-exists-p path)
-      (format t "Downloading poster for ~a... " (movie-title m))
+      (format t "Downloading poster for '~a'... " (movie-title m))
       (alexandria.2:write-byte-vector-into-file
        (dex:get (format nil "https://image.tmdb.org/t/p/original~a"
                         (movie-image-url m)))
@@ -27,17 +27,17 @@
 
 (defun id-movie (id)
   (format t "Downloading movie info for ~a... " id)
-  (let ((table
+  (let* ((table
           (com.inuoe.jzon:parse
            (dex:get
             (format nil
                     "~a/movie/~a?api_key=~a"
-                    *api-path* id *api-key*)))))
-    (prog1
-        (make-movie :id id
-                    :title (gethash "original_title" table)
-                    :image-url (gethash "poster_path" table))
-      (format t "done~%"))))
+                    *api-path* id *api-key*))))
+         (movie (make-movie :id id
+                            :title (gethash "original_title" table)
+                            :image-url (gethash "poster_path" table))))
+    (format t "identified as '~a'... done~%" (movie-title movie))
+    movie))
 
 (let ((movies
         (uiop:with-input-file (s *db-file*)
