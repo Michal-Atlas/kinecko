@@ -1,8 +1,9 @@
 #!/usr/bin/env -S sbcl --script
 
 (require :asdf)
-(require :dexador)
-(require :com.inuoe.jzon)
+(asdf:load-systems
+ :dexador
+ :com.inuoe.jzon)
 
 ;; (setf dex:*verbose* t)
 (defvar *api-path* (quri:uri "https://api.themoviedb.org/3/movie/"))
