@@ -1,4 +1,3 @@
-{-# LANGUAGE GHC2024 #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -10,11 +9,10 @@ import Data.Aeson qualified as JSON
 import Data.Bifunctor (Bifunctor (first))
 import Data.ByteString qualified as BS
 import Data.Map.Strict qualified as Map
-import Data.Maybe
 import Data.Text qualified as Text
 import GHC.Generics
 import Network.API.TheMovieDB qualified as TMDB
-import Network.API.TheMovieDB.Extras
+import Network.API.TheMovieDB.Extras ()
 import Network.HTTP.Simple
 import Polysemy
 import Polysemy.Error as PSE
@@ -22,6 +20,7 @@ import Polysemy.State (State, get, put, runState)
 import System.Directory
 import System.Environment
 import System.Process
+import Text.Read (readEither)
 
 data MediaRef = SeriesRef TMDB.ItemID | MovieRef TMDB.ItemID
   deriving (Ord, Eq)
@@ -29,6 +28,7 @@ data MediaRef = SeriesRef TMDB.ItemID | MovieRef TMDB.ItemID
 instance Read MediaRef where
   readsPrec _ ('s' : i) = [(SeriesRef $ read i, "")]
   readsPrec _ ('m' : i) = [(MovieRef $ read i, "")]
+  readsPrec _ _ = []
 
 instance Show MediaRef where
   show (SeriesRef i) = "s" ++ show i
@@ -52,7 +52,7 @@ instance JSON.ToJSON MediaRef
 
 instance JSON.ToJSONKey MediaRef
 
-data Errors = TMDB TMDB.Error | Aeson String
+data Errors = TMDB TMDB.Error | Aeson String | Cli String | IDRead String
   deriving (Show)
 
 getKey :: (Member (Embed IO) r) => Sem r TMDB.Key
@@ -68,10 +68,10 @@ tmdbToIO = interpret $ \case
     result <- embed $ TMDB.runTheMovieDB (TMDB.defaultSettings key) action
     fromEither $ first TMDB result
 
-loadIDs :: (Member (Embed IO) r) => FilePath -> Sem r [MediaRef]
+loadIDs :: Members '[Embed IO, Error Errors] r => FilePath -> Sem r [MediaRef]
 loadIDs file = do
   idStrs <- embed $ readFile file
-  return $ read <$> lines idStrs
+  fromEither $ sequence $ first IDRead . readEither <$> lines idStrs
 
 type URL = Text.Text
 
@@ -121,13 +121,13 @@ interpretFetchMediaCached action = do
   saveCache newCache
   return value
 
-getCachedConfig :: (Members '[Embed IO, Embed TMDB.TheMovieDB] r) => Sem r TMDB.Configuration
+getCachedConfig :: (Members '[Embed IO, Error Errors, Embed TMDB.TheMovieDB] r) => Sem r TMDB.Configuration
 getCachedConfig = do
   exists <- embed $ doesFileExist configFile
   if exists
     then do
       mconf <- embed $ JSON.decodeFileStrict configFile
-      return $ fromMaybe (error "Failed to decode config.json") mconf
+      note (Aeson "Failed to decode config.json") mconf
     else do
       conf <- embed TMDB.config
       embed $ JSON.encodeFile configFile conf
@@ -198,14 +198,14 @@ generateMontage files output =
              output
            ]
 
-program :: (Members '[Embed IO, MediaFetcher, Embed TMDB.TheMovieDB] r) => Sem r ()
+program :: (Members '[Embed IO, MediaFetcher, Error Errors, Embed TMDB.TheMovieDB] r) => Sem r ()
 program = do
   args <- embed $ getArgs
-  let (file, output) =
-        fromMaybe
-          (error "Usage: <input> <output>")
+  (file, output) <-
+        note
+          (Cli "Usage: <input> <output>")
           ( case args of
-              [file, output] -> Just (file, output)
+              [file', output'] -> Just (file', output')
               _ -> Nothing
           )
   ids <- loadIDs file

@@ -17,7 +17,7 @@ common warnings
 executable kinecko
     import:           warnings
     main-is:          Main.hs
-    -- other-modules:
+    other-modules:    Network.API.TheMovieDB.Extras
     -- other-extensions:
     build-depends:    base,
                       containers,
@@ -31,4 +31,4 @@ executable kinecko
                       polysemy,
                       polysemy-plugin
     hs-source-dirs:   app
-    default-language: GHC2021
+    default-language: GHC2024
