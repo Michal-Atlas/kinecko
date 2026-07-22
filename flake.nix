@@ -40,7 +40,7 @@
                 root = ./.;
                 fileset = fs.unions [
                   ./app
-                  ./kinecko.cabal
+                  ./kinecko-hs.cabal
                   ./LICENSE
                 ];
               };
@@ -59,14 +59,7 @@
             ];
             buildInputs = with pkgs; [ openssl.dev ];
           };
-          devShells.default = pkgs.mkShell {
-            inputsFrom = [ config.haskellProjects.default.outputs.devShell ];
-          };
-          packages.default = pkgs.runCommand "kinecko" { } ''
-            . ${pkgs.makeWrapper}/nix-support/setup-hook
-            makeWrapper ${self'.packages.kinecko}/bin/kinecko $out/bin/kinecko \
-                          --suffix PATH : ${lib.makeBinPath [ pkgs.gmic ]}
-          '';
+          devShells.haskell = config.haskellProjects.default.outputs.devShell;
         };
     };
 }
