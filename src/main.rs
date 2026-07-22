@@ -1,18 +1,17 @@
-use crate::Errors::*;
 use crate::Media::{Movie, Series};
 use crate::MediaRef::{MovieRef, SeriesRef};
+use anyhow::{Context, anyhow, bail};
 use serde::de::{Unexpected, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::collections::HashMap;
 use std::env::vars;
 use std::ffi::OsString;
+use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::fmt;
 use tmdb_client::apis::client::APIClient;
-use tmdb_client::apis::{MoviesApi, TVApi};
 use tmdb_client::models::{MovieDetails, TvDetails};
 
 type TmdbID = i32;
@@ -70,17 +69,17 @@ impl Into<String> for MediaRef {
 }
 
 impl TryFrom<&Media> for MediaRef {
-    type Error = ();
+    type Error = anyhow::Error;
     fn try_from(media: &Media) -> Result<Self, Self::Error> {
         Ok(match media {
-            Movie(movie) => MovieRef(movie.id.ok_or(())?),
-            Series(s) => SeriesRef(s.id.ok_or(())?),
+            Movie(movie) => MovieRef(movie.id.context("missing id")?),
+            Series(s) => SeriesRef(s.id.context("missing id")?),
         })
     }
 }
 
 impl TryFrom<String> for MediaRef {
-    type Error = &'static str;
+    type Error = anyhow::Error;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         Ok((if s.starts_with('m') {
@@ -88,12 +87,12 @@ impl TryFrom<String> for MediaRef {
         } else if s.starts_with('s') {
             SeriesRef
         } else {
-            return Err("unknown prefix");
+            bail!("unknown prefix")
         })(
             s.get(1..)
-                .ok_or("indexing")?
+                .ok_or_else(|| anyhow!("indexing"))?
                 .parse()
-                .map_err(|_| "int parse")?,
+                .map_err(|_| anyhow!("int parse"))?,
         ))
     }
 }
@@ -104,30 +103,22 @@ enum Media {
     Series(TvDetails),
 }
 
-// fn media_lift<'a, FM, FS, F, R: 'a>(movie_map: FM, series_map: FS) -> impl FnOnce(&'a Media) -> R
-// where
-//     FM: FnOnce(&'a MovieDetails) -> R,
-//     FS: FnOnce(&'a TvDetails) -> R,
-//     F: FnOnce(&'a Media) -> R,
-// {
-//     |media: &Media| match media {
-//         Movie(m) => movie_map(m),
-//         Series(s) => series_map(s),
-//     }
-// }
-
-fn media_poster_path(media: &Media) -> Result<&String, Errors> {
+fn media_poster_path(media: &Media) -> anyhow::Result<&String> {
     (match media {
-        Movie(m) => & m.poster_path,
-        Series(s) => & s.poster_path,
-    }).as_ref().ok_or(MissingPosterPath)
+        Movie(m) => &m.poster_path,
+        Series(s) => &s.poster_path,
+    })
+    .as_ref()
+    .context("missing poster path")
 }
 
-fn media_title(media: &Media) -> Result<&String, Errors> {
+fn media_title(media: &Media) -> anyhow::Result<&str> {
     (match media {
-        Movie(m) => &  m.title,
-        Series(s) => & s.name,
-    }).as_ref().ok_or(MissingTitle)
+        Movie(m) => &m.title,
+        Series(s) => &s.name,
+    })
+    .as_deref()
+    .context("missing title")
 }
 
 fn fetch_media_details(
@@ -144,29 +135,13 @@ fn fetch_media_details(
     })
 }
 
-#[derive(Debug)]
-enum Errors {
-    NoEnvKey,
-    IO(std::io::Error),
-    IORefFile(std::io::Error),
-    WriteCache(std::io::Error),
-    SerdeError(serde_json::Error),
-    ParseRefError(&'static str),
-    TmdbError(tmdb_client::Error),
-    ReqwestError(reqwest::Error),
-    MissingFromCache,
-    MissingTitle,
-    MissingPosterPath,
-    NoId,
-}
-
-fn load_refs(path_buf: PathBuf) -> Result<Vec<MediaRef>, Errors> {
-    let file = File::open(path_buf).map_err(IORefFile)?;
+fn load_refs(path_buf: PathBuf) -> anyhow::Result<Vec<MediaRef>> {
+    let file = File::open(path_buf).context("opening refs")?;
 
     let mut refs = vec![];
     for mline in BufReader::new(file).lines() {
-        let line = mline.map_err(IO)?;
-        refs.push(MediaRef::try_from(line).map_err(ParseRefError)?);
+        let line = mline?;
+        refs.push(MediaRef::try_from(line)?);
     }
     Ok(refs)
 }
@@ -175,13 +150,10 @@ fn fetch_media_details_into_cache(
     cache: &mut HashMap<MediaRef, Media>,
     tmdb_client: &APIClient,
     media_ref: MediaRef,
-) -> Result<(), Errors> {
+) -> anyhow::Result<()> {
     match cache.get(&media_ref) {
         Some(media) => {
-            println!(
-                "Media \"{}\" found in cache",
-                media_title(media)?
-            );
+            println!("Media \"{}\" found in cache", media_title(media)?);
             return Ok(());
         }
         None => {
@@ -190,29 +162,24 @@ fn fetch_media_details_into_cache(
         }
     }
 
-    let details = fetch_media_details(tmdb_client, media_ref).map_err(TmdbError)?;
-    println!(
-        "identified as {}",
-        media_title(&details)?
-    );
+    let details = fetch_media_details(tmdb_client, media_ref)?;
+    println!("identified as {}", media_title(&details)?);
     cache.insert(media_ref, details);
     Ok(())
 }
 
-fn ensure_file(m: &Media) -> Result<PathBuf, Errors> {
-    let path = PathBuf::from(STORE_DIR)
-        .join(<MediaRef as Into<String>>::into(MediaRef::try_from(m).map_err(|_| NoId)?) + ".jpg");
+fn ensure_file(media: &Media) -> anyhow::Result<PathBuf> {
+    let mref: MediaRef = media.try_into()?;
+    let s: String = mref.into();
+    let path = PathBuf::from(STORE_DIR).join(s + ".jpg");
     if !path.exists() {
-        println!("Downloading poster for \"{}\"... ", media_title(m)?);
-        let response = reqwest::blocking::get(
-            String::from(IMG_API) + media_poster_path(m)?,
-        )
-        .map_err(ReqwestError)?;
-        let mut dest = File::create(&path).map_err(IO)?;
-        dest.write_all(&(response.bytes().map_err(ReqwestError)?))
-            .map_err(IO)?;
+        println!("Downloading poster for \"{}\"... ", media_title(media)?);
+        let response = reqwest::blocking::get(String::from(IMG_API) + media_poster_path(media)?)
+            .context("downloading poster")?;
+        let mut dest = File::create(&path)?;
+        dest.write_all(&(response.bytes()?)).context("writing poster file")?;
     } else {
-        println!("Poster for \"{}\" already present", media_title(m)?);
+        println!("Poster for \"{}\" already present", media_title(media)?);
     };
     Ok(path)
 }
@@ -223,12 +190,12 @@ const REFS_FILE: &str = "movies.txt";
 
 const IMG_API: &str = "https://image.tmdb.org/t/p/original";
 
-fn main() -> Result<(), Errors> {
-    let key = vars().find(|(k, v)| k == "TMDB_KEY").ok_or(NoEnvKey)?.1;
+fn main() -> anyhow::Result<()> {
+    let key = vars().find(|(k, _)| k == "TMDB_KEY").context("no api key in env")?.1;
     let client = APIClient::new_with_api_key(key);
 
     let mut cache: HashMap<MediaRef, Media> = match File::open(CACHE_FILE) {
-        Ok(file) => serde_json::from_reader(file).map_err(SerdeError)?,
+        Ok(file) => serde_json::from_reader(file)?,
         _ => HashMap::new(),
     };
 
@@ -236,14 +203,13 @@ fn main() -> Result<(), Errors> {
     for &mref in media_refs.iter() {
         fetch_media_details_into_cache(&mut cache, &client, mref)?;
     }
-    serde_json::to_writer_pretty(File::create(CACHE_FILE).map_err(WriteCache)?, &cache)
-        .map_err(SerdeError)?;
+    serde_json::to_writer_pretty(File::create(CACHE_FILE).context("creating cache file")?, &cache)?;
 
     let medias = media_refs
         .iter()
         .map(|mref| cache.get(mref))
         .collect::<Option<Vec<&Media>>>()
-        .ok_or(MissingFromCache)?;
+        .context("missing from cache")?;
 
     let poster_paths = medias
         .iter()
@@ -274,7 +240,7 @@ fn main() -> Result<(), Errors> {
         .stdout(Stdio::inherit())
         .stdin(Stdio::inherit())
         .output()
-        .map_err(IO)?;
+        .context("running gmic")?;
 
     Ok(())
 }
