@@ -30,20 +30,19 @@
           lib,
           ...
         }:
+        let
+          fs = lib.fileset;
+        in
         {
           haskellProjects.default = {
-            projectRoot =
-              let
-                fs = lib.fileset;
-              in
-              fs.toSource {
-                root = ./.;
-                fileset = fs.unions [
-                  ./app
-                  ./kinecko-hs.cabal
-                  ./LICENSE
-                ];
-              };
+            projectRoot = fs.toSource {
+              root = ./.;
+              fileset = fs.unions [
+                ./app
+                ./kinecko-hs.cabal
+                ./LICENSE
+              ];
+            };
             packages.themoviedb.source = "1.2.2";
             settings.themoviedb.jailbreak = true;
             autoWire = [
@@ -60,6 +59,18 @@
             buildInputs = with pkgs; [ openssl.dev ];
           };
           devShells.haskell = config.haskellProjects.default.outputs.devShell;
+          packages.kinecko-net = pkgs.buildDotnetModule {
+            name = "kinecko-net";
+            src = fs.toSource {
+              root = ./.;
+              fileset = fs.unions [
+                ./kinecko-net.fsproj
+                ./Program.fs
+              ];
+            };
+            nugetDeps = ./nuget-deps.json;
+            dotnet-sdk = pkgs.dotnetCorePackages.sdk_11_0;
+          };
         };
     };
 }

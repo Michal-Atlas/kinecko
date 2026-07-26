@@ -1,0 +1,22 @@
+[
+  {
+    "pname": "Newtonsoft.Json",
+    "version": "13.0.4",
+    "hash": "sha256-8JCB1FdAW681qXP6DFDWvycu1oPyVoxaYgpJ2pUvZSk="
+  },
+  {
+    "pname": "SimpleExec",
+    "version": "13.0.0",
+    "hash": "sha256-ZSt8tgftU46pt+k8k/2fOEL6DL6XbFqWphhbULpBPPw="
+  },
+  {
+    "pname": "SmartAnalyzers.MultithreadingAnalyzer",
+    "version": "1.1.31",
+    "hash": "sha256-UOhn4T8f5cql/ix8IHecvP6sHUkw2PmnmEfV0jPRZeI="
+  },
+  {
+    "pname": "TMDbLib",
+    "version": "3.0.0",
+    "hash": "sha256-AFmYRDin+/UprwWrFubnwqhySLqA2r4B/QEOvDZC/D8="
+  }
+]
