@@ -121,7 +121,7 @@ let downloadFile (client: HttpClient) (url: string) (outputPath: string) : Async
 let fetchPoster (client: HttpClient) (media: Media) : Async<string> =
     async {
         let posterPath = mediaPosterPath media
-        let filePath = "store/" + posterPath.Substring 1
+        let filePath = Path.Combine("store", posterPath.TrimStart '/')
 
         if File.Exists filePath then
             printfn $"Poster for {mediaTitle media} already present"
