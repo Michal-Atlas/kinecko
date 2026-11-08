@@ -1,8 +1,12 @@
 store/
 .direnv/
 *.jpg
+result
+result-*
 
+# Rust
+rust/target/
 
-# Added by cargo
-
-/target
+# F#
+fsharp/bin/
+fsharp/obj/
